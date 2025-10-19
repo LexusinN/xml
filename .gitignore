@@ -1,22 +1,77 @@
-### AL ###
-#Template for AL projects for Dynamics 365 Business Central
-#launch.json folder
-.vscode/
-#Cache folder
-.alcache/
-#Symbols folder
-.alpackages/
-#Snapshots folder
-.snapshots/
-#Testing Output folder
-.output/
-#Extension App-file
-*.app
-#Rapid Application Development File
-rad.json
-#Translation Base-file
-*.g.xlf
-#License-file
-*.flf
-#Test results file
-TestResults.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="1.0"
+  xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+
+  <xsl:output method="html" encoding="UTF-8" indent="yes"/>
+  <xsl:strip-space elements="*"/>
+
+  <!-- Ключи для Muenchian-группировки -->
+  <xsl:key name="by-city" match="item" use="@city"/>
+  <!-- Компании уникальны в разрезе города -->
+  <xsl:key name="by-city-org" match="item" use="concat(@city, '|', @org)"/>
+  <!-- Товары уникальны в разрезе (город, компания, товар) -->
+  <xsl:key name="by-city-org-title" match="item" use="concat(@city, '|', @org, '|', @title)"/>
+
+  <xsl:template match="/">
+    <xsl:apply-templates select="orgs"/>
+  </xsl:template>
+
+  <xsl:template match="orgs">
+    <html>
+      <head>
+        <meta charset="UTF-8"/>
+        <title>Города → Компании → Товары</title>
+        <style>
+          body { font-family: system-ui, sans-serif; line-height: 1.5; }
+          h1 { margin-bottom: 0.25rem; }
+          h2 { margin: 1.25rem 0 0.25rem; }
+          h3 { margin: 0.75rem 0 0.25rem; }
+          ul { margin: 0.25rem 0 0.75rem 1.25rem; }
+          .value { color: #555; margin-left: .5rem; }
+        </style>
+      </head>
+      <body>
+        <h1>Города → Компании → Товары</h1>
+
+        <!-- Уникальные города -->
+        <xsl:for-each select="item[generate-id() = generate-id(key('by-city', @city)[1])]">
+          <xsl:sort select="@city"/>
+          <xsl:variable name="city" select="@city"/>
+
+          <section class="city">
+            <h2><xsl:value-of select="$city"/></h2>
+
+            <!-- Уникальные компании внутри города (учитываем одноимённые в разных городах) -->
+            <xsl:for-each
+              select="key('by-city', $city)
+                      [generate-id() = generate-id(key('by-city-org', concat($city, '|', @org))[1])]">
+              <xsl:sort select="@org"/>
+              <xsl:variable name="org" select="@org"/>
+
+              <div class="company">
+                <h3><xsl:value-of select="$org"/></h3>
+                <ul class="products">
+                  <!-- Уникальные товары внутри компании (при наличии дублей суммируем value) -->
+                  <xsl:for-each
+                    select="key('by-city-org', concat($city, '|', $org))
+                            [generate-id() = generate-id(key('by-city-org-title',
+                              concat($city, '|', $org, '|', @title))[1])]">
+                    <xsl:sort select="@title"/>
+                    <li>
+                      <span class="title"><xsl:value-of select="@title"/></span>
+                      <span class="value">
+                        <xsl:value-of
+                          select="sum(key('by-city-org-title',
+                                   concat($city, '|', $org, '|', @title))/@value)"/>
+                      </span>
+                    </li>
+                  </xsl:for-each>
+                </ul>
+              </div>
+            </xsl:for-each>
+          </section>
+        </xsl:for-each>
+      </body>
+    </html>
+  </xsl:template>
+</xsl:stylesheet>
